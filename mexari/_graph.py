@@ -112,6 +112,10 @@ def build_graph(
     G.graph["source_geojson"] = str(geojson_path)
     G.graph["source_csv"] = str(csv_path)
 
+    # Create a dictioary mapping CVEGEO to node index for edge construction
+    node_dict: dict[str, int] = {}
+    node_index = 0
+    
     for feat in features:
         props = feat["properties"]
         cvegeo: str = props["CVEGEO"]
@@ -122,21 +126,23 @@ def build_graph(
         else:
             mort_series = {d: 0.0 for d in available_dates}
             feat_vector = np.zeros(len(available_dates), dtype=np.float32)
+        node_dict[cvegeo] = node_index
         G.add_node(
-            cvegeo,
-            cvegeo=cvegeo,
-            mun_name=props.get("NOMGEO", ""),
-            state_name=props.get("NOM_ENT", ""),
-            cve_ent=props.get("CVE_ENT", ""),
-            cve_mun=props.get("CVE_MUN", ""),
-            lon=lon,
-            lat=lat,
+            node_index,
+            municipality=props.get("NOMGEO", ""),
+            state=props.get("NOM_ENT", ""),
+            longitude=lon,
+            latitude=lat,
             mortality=mort_series,
             features=feat_vector,
         )
+        node_index += 1
 
     for u, v in _build_adjacency(features):
-        G.add_edge(u, v, weight=1.0)
+        # Convert CVEGEO to node indices
+        u_idx = node_dict[u]
+        v_idx = node_dict[v]
+        G.add_edge(u_idx, v_idx, weight=1.0)
 
     return G
 
