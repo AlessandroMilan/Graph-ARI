@@ -1,19 +1,19 @@
 """
-mexari
-======
+graphari
+========
 Weekly municipal NetworkX graphs for geostatistical analysis of ARI mortality
 and climate covariates in Mexico.
 
 Quick start
 -----------
->>> import mexari
->>> graphs = mexari.build_graphs()
+>>> import graphari
+>>> graphs = graphari.build_graphs()
 >>> G = graphs["2020/01"]
->>> X, order = mexari.get_node_feature_matrix(G)
->>> edge_index = mexari.get_edge_index(G, order)
+>>> X, order = graphari.get_node_feature_matrix(G)
+>>> edge_index = graphari.get_edge_index(G, order)
 """
 
-from mexari._data import (
+from graphari._data import (
     available_feature_tables,
     available_epiweeks,
     load_feature_table,
@@ -21,7 +21,7 @@ from mexari._data import (
     normalize_cvegeo,
     normalize_epiweek,
 )
-from mexari._graph import (
+from graphari._graph import (
     build_graph,
     build_graphs,
     get_edge_index,

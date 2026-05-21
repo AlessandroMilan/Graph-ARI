@@ -1,6 +1,6 @@
 """
-mexari._data
-============
+graphari._data
+==============
 Helpers for loading bundled weekly municipality geostatistical tables.
 """
 

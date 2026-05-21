@@ -1,6 +1,6 @@
 """
-mexari._graph
-=============
+graphari._graph
+===============
 Weekly NetworkX graph construction for geostatistical analysis.
 """
 
@@ -13,7 +13,7 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
-from mexari._data import (
+from graphari._data import (
     DATA_DIR,
     DEFAULT_ADJACENCY_MATRIX_CSV,
     DEFAULT_EDGES_CSV,

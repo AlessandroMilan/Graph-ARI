@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mexari"
+name = "graphari"
 version = "0.3.0"
 description = "Weekly municipal NetworkX graphs for geostatistical analysis in Mexico"
 readme = "README.md"
@@ -18,7 +18,7 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["mexari*"]
+include = ["graphari*"]
 
 [tool.setuptools.package-data]
-mexari = ["data/*.csv", "data/*.geojson"]
+graphari = ["data/*.csv", "data/*.geojson"]
