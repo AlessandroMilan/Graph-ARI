@@ -16,10 +16,7 @@ Quick start
 from graphari._data import (
     available_feature_tables,
     available_epiweeks,
-    load_feature_table,
     load_feature_tables,
-    normalize_cvegeo,
-    normalize_epiweek,
 )
 from graphari._graph import (
     build_graph,
@@ -35,10 +32,7 @@ __all__ = [
     "build_graphs",
     "get_node_feature_matrix",
     "get_edge_index",
-    "load_feature_table",
     "load_feature_tables",
     "available_feature_tables",
     "available_epiweeks",
-    "normalize_epiweek",
-    "normalize_cvegeo",
 ]

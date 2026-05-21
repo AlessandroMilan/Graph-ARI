@@ -23,6 +23,8 @@ from graphari._data import (
 )
 
 EXPECTED_NODE_COUNT = 2478
+EXISTS_ATTRIBUTE_NAME = "exists"
+STATIC_ATTRIBUTE_NAMES = ("population", "latitude", "longitude")
 
 
 def _load_nodes(edge_list_path: str | Path) -> tuple[list[tuple[str, dict]], list[str]]:
@@ -31,6 +33,8 @@ def _load_nodes(edge_list_path: str | Path) -> tuple[list[tuple[str, dict]], lis
         raise FileNotFoundError(f"Edge list file not found: {csv_path}")
 
     df = pd.read_csv(csv_path, dtype={"CVEGEO": str, "CVE_ENT": str, "CVE_MUN": str})
+    lower_to_column = {column.casefold(): column for column in df.columns}
+
     required_columns = {
         "CVEGEO",
         "CVE_ENT",
@@ -39,38 +43,73 @@ def _load_nodes(edge_list_path: str | Path) -> tuple[list[tuple[str, dict]], lis
         "NOMMUN",
         "centroid_lon",
         "centroid_lat",
+        "creation_week",
     }
-    missing = sorted(required_columns - set(df.columns))
+    missing = sorted(
+        required
+        for required in required_columns
+        if required.casefold() not in lower_to_column
+    )
     if missing:
         raise ValueError(
             f"Edge list CSV is missing required columns: {', '.join(missing)}"
         )
 
+    cvegeo_col = lower_to_column["cvegeo"]
+    cve_ent_col = lower_to_column["cve_ent"]
+    cve_mun_col = lower_to_column["cve_mun"]
+    state_col = lower_to_column["nomgeo"]
+    municipality_col = lower_to_column["nommun"]
+    lon_col = lower_to_column["centroid_lon"]
+    lat_col = lower_to_column["centroid_lat"]
+    creation_week_col = lower_to_column["creation_week"]
+
+    population_col = lower_to_column.get("population")
+    if population_col is None:
+        population_col = lower_to_column.get("pop")
+    if population_col is None:
+        raise ValueError("Edge list CSV is missing required columns: Population")
+
     nodes: list[tuple[str, dict]] = []
     order: list[str] = []
     seen: set[str] = set()
-    for row in df.itertuples(index=False):
-        cvegeo = normalize_cvegeo(getattr(row, "CVEGEO"))
+    for row in df.to_dict(orient="records"):
+        cvegeo = normalize_cvegeo(row[cvegeo_col])
         if cvegeo in seen:
             raise ValueError(f"Duplicate CVEGEO in edge list CSV: {cvegeo}")
         seen.add(cvegeo)
         order.append(cvegeo)
+
+        creation_week = normalize_epiweek(row[creation_week_col])
+        population = _parse_population(row[population_col])
 
         nodes.append(
             (
                 cvegeo,
                 {
                     "cvegeo": cvegeo,
-                    "municipality": str(getattr(row, "NOMMUN", "") or ""),
-                    "state": str(getattr(row, "NOMGEO", "") or ""),
-                    "cve_ent": str(getattr(row, "CVE_ENT", cvegeo[:2]) or cvegeo[:2]).zfill(2),
-                    "cve_mun": str(getattr(row, "CVE_MUN", cvegeo[2:]) or cvegeo[2:]).zfill(3),
-                    "longitude": float(getattr(row, "centroid_lon")),
-                    "latitude": float(getattr(row, "centroid_lat")),
+                    "municipality": str(row.get(municipality_col, "") or ""),
+                    "state": str(row.get(state_col, "") or ""),
+                    "cve_ent": str(row.get(cve_ent_col, cvegeo[:2]) or cvegeo[:2]).zfill(2),
+                    "cve_mun": str(row.get(cve_mun_col, cvegeo[2:]) or cvegeo[2:]).zfill(3),
+                    "longitude": float(row[lon_col]),
+                    "latitude": float(row[lat_col]),
+                    "population": population,
+                    "creation_week": creation_week,
                 },
             )
         )
     return nodes, order
+
+
+def _parse_population(value: object) -> int:
+    population = pd.to_numeric(pd.Series([value]), errors="raise")[0]
+    if pd.isna(population):
+        raise ValueError("Population values cannot be empty.")
+    population = int(population)
+    if population < 0:
+        raise ValueError("Population values cannot be negative.")
+    return population
 
 
 def _load_weighted_edges(
@@ -115,31 +154,31 @@ def _series_value(values, cvegeo: str) -> float:
 
 
 def _build_week_graph(
-    *,
     week: str,
     feature_rows: dict[str, object],
     nodes: list[tuple[str, dict]],
     edges: list[tuple[str, str, float]],
-    edge_list_path: Path,
-    adjacency_matrix_path: Path,
-    source_csvs: dict[str, str],
     feature_names: list[str],
 ) -> nx.Graph:
     G = nx.Graph()
+    exogenous_feature_names = [*feature_names, EXISTS_ATTRIBUTE_NAME]
 
     G.graph.update(
         {
             "epidemiological_week": week,
-            "feature_names": feature_names,
+            "exogenous_variables": exogenous_feature_names,
+            "static_attributes": list(STATIC_ATTRIBUTE_NAMES),
+            "node_attributes": [*exogenous_feature_names, *STATIC_ATTRIBUTE_NAMES],
         }
     )
 
     for cvegeo, base_attrs in nodes:
         attrs = dict(base_attrs)
+        creation_week = attrs.pop("creation_week")
         for feature_name in feature_names:
             feature_value = _series_value(feature_rows[feature_name], cvegeo)
             attrs[feature_name] = feature_value
-
+        attrs[EXISTS_ATTRIBUTE_NAME] = float(week >= creation_week)
         G.add_node(cvegeo, **attrs)
 
     G.add_edges_from((u, v, {"weight": w}) for u, v, w in edges)
@@ -147,37 +186,30 @@ def _build_week_graph(
 
 
 def build_graphs(
-    edge_list_path: str | Path = DEFAULT_EDGES_CSV,
-    adjacency_matrix_path: str | Path = DEFAULT_ADJACENCY_MATRIX_CSV,
-    *,
-    data_dir: str | Path = DATA_DIR,
     feature_files: Iterable[str | Path] | None = None,
     start_week: str | int | None = None,
     end_week: str | int | None = None,
     weeks: Iterable[str | int] | None = None,
-    expected_nodes: int | None = EXPECTED_NODE_COUNT,
 ) -> dict[str, nx.Graph]:
     """
     Build one municipal weighted graph per epidemiological week.
 
     By default this builds all bundled weeks from ``2003/01`` through
     ``2024/52`` using all bundled weekly municipality feature tables in
-    ``mexari/data`` plus topology from ``edges.csv`` and
-    ``adjacency_matrix.csv``. Pass ``start_week``/``end_week`` for an inclusive
-    period, or ``weeks`` for an explicit list of epidemiological weeks.
+    ``graphari/data`` plus topology from ``edges.csv`` and
+    ``adjacency_matrix.csv``.
     """
-    edge_list_path = Path(edge_list_path)
-    adjacency_matrix_path = Path(adjacency_matrix_path)
+    edge_list_path = Path(DEFAULT_EDGES_CSV)
+    adjacency_matrix_path = Path(DEFAULT_ADJACENCY_MATRIX_CSV)
 
     nodes, node_order = _load_nodes(edge_list_path)
-    if expected_nodes is not None and len(nodes) != expected_nodes:
+    if EXPECTED_NODE_COUNT is not None and len(nodes) != EXPECTED_NODE_COUNT:
         raise ValueError(
-            f"Expected {expected_nodes} municipality nodes, got {len(nodes)} from {edge_list_path}."
+            f"Expected {EXPECTED_NODE_COUNT} municipality nodes, got {len(nodes)} from {edge_list_path}."
         )
 
     feature_files_list = list(feature_files) if feature_files is not None else None
     feature_tables = load_feature_tables(
-        data_dir=data_dir,
         feature_files=feature_files_list,
         start_week=start_week,
         end_week=end_week,
@@ -186,14 +218,14 @@ def build_graphs(
     feature_names = list(feature_tables.keys())
     week_index = feature_tables[feature_names[0]].index
     source_csvs = {
-        name: str(Path(data_dir) / f"{name}.csv") for name in feature_names
+        name: str(Path(DATA_DIR) / f"{name}.csv") for name in feature_names
     }
     if feature_files_list is not None:
         source_csvs = {}
         for file_path, feature_name in zip(feature_files_list, feature_names):
             candidate = Path(file_path)
             if not candidate.is_absolute():
-                candidate = Path(data_dir) / candidate
+                candidate = Path(DATA_DIR) / candidate
             source_csvs[feature_name] = str(candidate)
 
     edges = _load_weighted_edges(adjacency_matrix_path, node_order)
@@ -206,60 +238,27 @@ def build_graphs(
             feature_rows=feature_rows,
             nodes=nodes,
             edges=edges,
-            edge_list_path=edge_list_path,
-            adjacency_matrix_path=adjacency_matrix_path,
-            source_csvs=source_csvs,
             feature_names=feature_names,
         )
     return graphs
 
 
 def build_graph(
-    edge_list_path: str | Path = DEFAULT_EDGES_CSV,
-    adjacency_matrix_path: str | Path = DEFAULT_ADJACENCY_MATRIX_CSV,
-    *,
-    data_dir: str | Path = DATA_DIR,
     feature_files: Iterable[str | Path] | None = None,
     week: str | int | None = None,
-    date: str | int | None = None,
-    start_week: str | int | None = None,
-    end_week: str | int | None = None,
-    weeks: Iterable[str | int] | None = None,
-    expected_nodes: int | None = EXPECTED_NODE_COUNT,
 ) -> nx.Graph | dict[str, nx.Graph]:
     """
     Build weekly graphs, or a single graph when ``week`` is provided.
-
-    ``date`` is accepted as a legacy alias for ``week``.
     """
-    if date is not None:
-        if week is not None:
-            raise ValueError("Specify either week or date, not both.")
-        week = date
 
     if week is not None:
-        if weeks is not None or start_week is not None or end_week is not None:
-            raise ValueError("Specify either a single week or a period, not both.")
         normalized_week = normalize_epiweek(week)
         return build_graphs(
-            edge_list_path,
-            adjacency_matrix_path,
-            data_dir=data_dir,
             feature_files=feature_files,
             weeks=[normalized_week],
-            expected_nodes=expected_nodes,
         )[normalized_week]
-
-    return build_graphs(
-        edge_list_path,
-        adjacency_matrix_path,
-        data_dir=data_dir,
-        feature_files=feature_files,
-        start_week=start_week,
-        end_week=end_week,
-        weeks=weeks,
-        expected_nodes=expected_nodes,
-    )
+    
+    raise ValueError("week must be provided to build a single graph.")
 
 
 def get_node_feature_matrix(G: nx.Graph) -> tuple[np.ndarray, list[str]]:

@@ -148,10 +148,9 @@ def _canonical_feature_name(file_name: str) -> str:
 
 def _resolve_feature_paths(
     *,
-    data_dir: str | Path = DATA_DIR,
     feature_files: Iterable[str | Path] | None = None,
 ) -> list[Path]:
-    base_dir = Path(data_dir)
+    base_dir = Path(DATA_DIR)
     if feature_files is None:
         paths = [base_dir / name for name in DEFAULT_FEATURE_FILES]
     else:
@@ -171,9 +170,9 @@ def _resolve_feature_paths(
     return paths
 
 
-def available_feature_tables(data_dir: str | Path = DATA_DIR) -> list[str]:
+def available_feature_tables() -> list[str]:
     """Return weekly municipality CSV files available in the data folder."""
-    base_dir = Path(data_dir)
+    base_dir = Path(DATA_DIR)
     return sorted(
         path.name
         for path in base_dir.glob("*.csv")
@@ -199,7 +198,6 @@ def load_feature_table(
 
 def load_feature_tables(
     *,
-    data_dir: str | Path = DATA_DIR,
     feature_files: Iterable[str | Path] | None = None,
     start_week: str | int | None = None,
     end_week: str | int | None = None,
@@ -210,7 +208,7 @@ def load_feature_tables(
 
     Returns a dictionary mapping canonical feature names to aligned DataFrames.
     """
-    feature_paths = _resolve_feature_paths(data_dir=data_dir, feature_files=feature_files)
+    feature_paths = _resolve_feature_paths(feature_files=feature_files)
     tables: dict[str, pd.DataFrame] = {}
     reference_index: pd.Index | None = None
     reference_columns: pd.Index | None = None
@@ -240,8 +238,8 @@ def load_feature_tables(
     return tables
 
 
-def available_epiweeks(data_dir: str | Path = DATA_DIR) -> list[str]:
+def available_epiweeks() -> list[str]:
     """Return epidemiological weeks available in the default bundled feature span."""
-    first_default = Path(data_dir) / DEFAULT_FEATURE_FILES[0]
+    first_default = Path(DATA_DIR) / DEFAULT_FEATURE_FILES[0]
     df = pd.read_csv(first_default, index_col=0, usecols=[0])
     return [normalize_epiweek(week) for week in df.index]
