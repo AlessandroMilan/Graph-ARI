@@ -1,43 +1,44 @@
 """
 mexari
 ======
-Spatio-temporal NetworkX graph of ARI mortality rates
-across Mexican municipalities.
+Weekly municipal NetworkX graphs for geostatistical analysis of ARI mortality
+and climate covariates in Mexico.
 
 Quick start
 -----------
 >>> import mexari
->>> geojson_path = "/path/to/mexico.geojson"
->>> G = mexari.build_graph(geojson_path)
->>> G = mexari.build_graph(geojson_path, date="2020/01")
+>>> graphs = mexari.build_graphs()
+>>> G = graphs["2020/01"]
 >>> X, order = mexari.get_node_feature_matrix(G)
 >>> edge_index = mexari.get_edge_index(G, order)
 """
 
+from mexari._data import (
+    available_feature_tables,
+    available_epiweeks,
+    load_feature_table,
+    load_feature_tables,
+    normalize_cvegeo,
+    normalize_epiweek,
+)
 from mexari._graph import (
     build_graph,
-    get_node_feature_matrix,
+    build_graphs,
     get_edge_index,
-)
-from mexari._data import DEFAULT_CSV
-from mexari._forecasting import (
-    TemporalSplit,
-    make_temporal_split,
-    region_window_starts,
-    scale_time_signal,
-    train_scaler_from_region,
+    get_node_feature_matrix,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.3.0"
 __author__ = "Alessandro Milan Ortega"
 __all__ = [
     "build_graph",
+    "build_graphs",
     "get_node_feature_matrix",
     "get_edge_index",
-    "DEFAULT_CSV",
-    "TemporalSplit",
-    "make_temporal_split",
-    "region_window_starts",
-    "scale_time_signal",
-    "train_scaler_from_region",
+    "load_feature_table",
+    "load_feature_tables",
+    "available_feature_tables",
+    "available_epiweeks",
+    "normalize_epiweek",
+    "normalize_cvegeo",
 ]

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mexari"
-version = "0.1.0"
-description = "Spatio-temporal NetworkX graph of ARI mortality rates across Mexican municipalities"
+version = "0.3.0"
+description = "Weekly municipal NetworkX graphs for geostatistical analysis in Mexico"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
@@ -16,12 +16,9 @@ dependencies = [
     "shapely>=2.0",
 ]
 
-[project.optional-dependencies]
-dev = ["pytest", "matplotlib", "scipy"]
-
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["mexari*"]
 
 [tool.setuptools.package-data]
-mexari = ["data/*.csv"]
+mexari = ["data/*.csv", "data/*.geojson"]
