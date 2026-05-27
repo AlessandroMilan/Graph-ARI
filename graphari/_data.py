@@ -25,6 +25,7 @@ DEFAULT_FEATURE_FILES: tuple[str, ...] = (
     "2m_mean_temperature.csv",
     "2m_relative_humidity.csv",
     "total_precipitation.csv",
+    "10m_wind_speed.csv",
 )
 
 DEFAULT_START_WEEK = "2003/01"
@@ -231,7 +232,7 @@ def load_feature_tables(
             if not df.index.equals(reference_index):
                 raise ValueError(f"Feature table weeks are not aligned: {path}")
             if not df.columns.equals(reference_columns):
-                raise ValueError(f"Feature table municipalities are not aligned: {path}")
+                df = df.reindex(columns=reference_columns, fill_value=0.0)
 
         tables[feature_name] = df
 

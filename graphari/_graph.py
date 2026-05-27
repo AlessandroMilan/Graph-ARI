@@ -17,6 +17,7 @@ from graphari._data import (
     DATA_DIR,
     DEFAULT_ADJACENCY_MATRIX_CSV,
     DEFAULT_EDGES_CSV,
+    load_feature_table,
     load_feature_tables,
     normalize_cvegeo,
     normalize_epiweek,
@@ -24,7 +25,9 @@ from graphari._data import (
 
 EXPECTED_NODE_COUNT = 2478
 EXISTS_ATTRIBUTE_NAME = "exists"
+MORTALITY_ATTRIBUTE_NAME = "mortality_rate"
 STATIC_ATTRIBUTE_NAMES = ("population", "latitude", "longitude")
+MORTALITY_RATES_CSV = DATA_DIR / "mortality_rates.csv"
 
 
 def _load_nodes(edge_list_path: str | Path) -> tuple[list[tuple[str, dict]], list[str]]:
@@ -156,32 +159,49 @@ def _series_value(values, cvegeo: str) -> float:
 def _build_week_graph(
     week: str,
     feature_rows: dict[str, object],
+    mortality_values: object,
     nodes: list[tuple[str, dict]],
     edges: list[tuple[str, str, float]],
     feature_names: list[str],
 ) -> nx.Graph:
     G = nx.Graph()
     exogenous_feature_names = [*feature_names, EXISTS_ATTRIBUTE_NAME]
+    endogenous_feature_names = [MORTALITY_ATTRIBUTE_NAME]
+    existing_nodes: set[str] = set()
 
     G.graph.update(
         {
+            "feature_names": feature_names,
             "epidemiological_week": week,
             "exogenous_variables": exogenous_feature_names,
+            "endogenous_variables": endogenous_feature_names,
             "static_attributes": list(STATIC_ATTRIBUTE_NAMES),
-            "node_attributes": [*exogenous_feature_names, *STATIC_ATTRIBUTE_NAMES],
+            "node_attributes": [
+                *exogenous_feature_names,
+                *endogenous_feature_names,
+                *STATIC_ATTRIBUTE_NAMES,
+            ],
         }
     )
 
     for cvegeo, base_attrs in nodes:
         attrs = dict(base_attrs)
         creation_week = attrs.pop("creation_week")
+        if week < creation_week:
+            continue
         for feature_name in feature_names:
             feature_value = _series_value(feature_rows[feature_name], cvegeo)
             attrs[feature_name] = feature_value
-        attrs[EXISTS_ATTRIBUTE_NAME] = float(week >= creation_week)
+        attrs[EXISTS_ATTRIBUTE_NAME] = True
+        attrs[MORTALITY_ATTRIBUTE_NAME] = _series_value(mortality_values, cvegeo)
         G.add_node(cvegeo, **attrs)
+        existing_nodes.add(cvegeo)
 
-    G.add_edges_from((u, v, {"weight": w}) for u, v, w in edges)
+    G.add_edges_from(
+        (u, v, {"weight": w})
+        for u, v, w in edges
+        if u in existing_nodes and v in existing_nodes
+    )
     return G
 
 
@@ -215,27 +235,32 @@ def build_graphs(
         end_week=end_week,
         weeks=weeks,
     )
+    mortality_table = load_feature_table(
+        MORTALITY_RATES_CSV,
+        start_week=start_week,
+        end_week=end_week,
+        weeks=weeks,
+    )
+
     feature_names = list(feature_tables.keys())
     week_index = feature_tables[feature_names[0]].index
-    source_csvs = {
-        name: str(Path(DATA_DIR) / f"{name}.csv") for name in feature_names
-    }
-    if feature_files_list is not None:
-        source_csvs = {}
-        for file_path, feature_name in zip(feature_files_list, feature_names):
-            candidate = Path(file_path)
-            if not candidate.is_absolute():
-                candidate = Path(DATA_DIR) / candidate
-            source_csvs[feature_name] = str(candidate)
+    if not mortality_table.index.equals(week_index):
+        raise ValueError("mortality_rates.csv weeks are not aligned with feature tables.")
+
+    reference_columns = feature_tables[feature_names[0]].columns
+    if not mortality_table.columns.equals(reference_columns):
+        mortality_table = mortality_table.reindex(columns=reference_columns, fill_value=0.0)
 
     edges = _load_weighted_edges(adjacency_matrix_path, node_order)
 
     graphs: dict[str, nx.Graph] = {}
     for week in week_index:
         feature_rows = {name: df.loc[week] for name, df in feature_tables.items()}
+        mortality_values = mortality_table.loc[week]
         graphs[week] = _build_week_graph(
             week=week,
             feature_rows=feature_rows,
+            mortality_values=mortality_values,
             nodes=nodes,
             edges=edges,
             feature_names=feature_names,
