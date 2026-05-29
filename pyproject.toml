@@ -4,10 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "graphari"
-version = "0.3.0"
+version = "1.0"
 description = "Weekly municipal NetworkX graphs for geostatistical analysis in Mexico"
 readme = "README.md"
-license = { file = "LICENSE" }
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Hector Alessandro Milan" },
+]
 requires-python = ">=3.10"
 dependencies = [
     "networkx>=3.0",
@@ -15,6 +19,30 @@ dependencies = [
     "pandas>=2.0",
     "shapely>=2.0",
 ]
+keywords = [
+    "graph",
+    "networkx",
+    "geospatial",
+    "epidemiology",
+    "mexico",
+    "climate",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: GIS",
+]
+
+[project.urls]
+Homepage = "https://github.com/alessandromilanortega/Graph-ARI"
+Repository = "https://github.com/alessandromilanortega/Graph-ARI"
+Issues = "https://github.com/alessandromilanortega/Graph-ARI/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
