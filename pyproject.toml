@@ -40,9 +40,9 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/alessandromilanortega/Graph-ARI"
-Repository = "https://github.com/alessandromilanortega/Graph-ARI"
-Issues = "https://github.com/alessandromilanortega/Graph-ARI/issues"
+Homepage = "https://github.com/AlessandroMilan/Graph-ARI"
+Repository = "https://github.com/AlessandroMilan/Graph-ARI"
+Issues = "https://github.com/AlessandroMilan/Graph-ARI/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
