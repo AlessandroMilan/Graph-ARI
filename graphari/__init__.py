@@ -25,7 +25,7 @@ from graphari._graph import (
     get_node_feature_matrix,
 )
 
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 __author__ = "Hector Alessandro Milan"
 __all__ = [
     "build_graph",
