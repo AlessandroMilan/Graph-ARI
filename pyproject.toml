@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "graphari"
-version = "1.0.2"
+version = "1.0.3"
 description = "Weekly municipal NetworkX graphs for geostatistical analysis in Mexico"
 readme = "README.md"
 license = "GPL-3.0-or-later"
